@@ -1,8 +1,6 @@
 # Xeno AI Campaign Copilot
 
-[![CI](https://github.com/xeno-ai/campaign-copilot/actions/workflows/ci.yml/badge.svg)](https://github.com/xeno-ai/campaign-copilot/actions)
-[![Coverage](https://img.shields.io/badge/coverage-80%25-green)](.)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 
 Production-grade mini CRM for retail and D2C lifecycle marketing across WhatsApp, SMS, Email, and RCS.
 
