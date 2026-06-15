@@ -27,6 +27,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     "content-type": "application/json",
+    "Bypass-Tunnel-Reminder": "true",
     ...(init?.headers as Record<string, string> || {}),
   };
 
@@ -59,7 +60,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 export async function login(email: string, password: string): Promise<{ token: string; user?: Record<string, unknown> }> {
   const res = await fetch(`${API_URL}/api/v1/auth/login`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "Bypass-Tunnel-Reminder": "true" },
     body: JSON.stringify({ email, password }),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -76,7 +77,7 @@ export async function login(email: string, password: string): Promise<{ token: s
 export async function register(email: string, password: string, fullName: string): Promise<{ token: string }> {
   const res = await fetch(`${API_URL}/api/v1/auth/register`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", "Bypass-Tunnel-Reminder": "true" },
     body: JSON.stringify({ email, password, full_name: fullName }),
   });
   if (!res.ok) throw new Error(await res.text());
