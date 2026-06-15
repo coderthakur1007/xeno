@@ -1,0 +1,300 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: xeno
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: xeno-config
+  namespace: xeno
+data:
+  APP_ENV: "production"
+  LOG_LEVEL: "info"
+  CRM_WEBHOOK_URL: "http://xeno-api.xeno.svc.cluster.local:8000/api/v1/webhooks/channel-events"
+  REDIS_URL: "redis://xeno-redis.xeno.svc.cluster.local:6379/0"
+  API_BASE_URL: "http://xeno-api.xeno.svc.cluster.local:8000"
+  WEB_PORT: "3000"
+  API_PORT: "8000"
+  SIMULATOR_PORT: "8100"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: xeno-secrets
+  namespace: xeno
+type: Opaque
+data:
+  # base64 encoded placeholders — replace before deploying
+  DATABASE_URL: cG9zdGdyZXNxbDovL3hlbm86eGVub3Bhc3NAeGVuby1wb3N0Z3Jlcy54ZW5vLnN2Yy5jbHVzdGVyLmxvY2FsOjU0MzIveGVubw==
+  JWT_SECRET: Y2hhbmdlLW1lLWluLXByb2R1Y3Rpb24=
+  WEBHOOK_SECRET: d2ViaG9vay1zZWNyZXQtY2hhbmdlLW1l
+  OPENAI_API_KEY: c2stcGxhY2Vob2xkZXI=
+---
+# ======================== API Deployment ========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xeno-api
+  namespace: xeno
+  labels:
+    app: xeno-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: xeno-api
+  template:
+    metadata:
+      labels:
+        app: xeno-api
+    spec:
+      containers:
+        - name: api
+          image: xeno/api:latest
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: xeno-config
+            - secretRef:
+                name: xeno-secrets
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+---
+# ======================== Web Deployment ========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xeno-web
+  namespace: xeno
+  labels:
+    app: xeno-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: xeno-web
+  template:
+    metadata:
+      labels:
+        app: xeno-web
+    spec:
+      containers:
+        - name: web
+          image: xeno/web:latest
+          ports:
+            - containerPort: 3000
+          envFrom:
+            - configMapRef:
+                name: xeno-config
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+          readinessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+---
+# ======================== Simulator Deployment ========================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xeno-simulator
+  namespace: xeno
+  labels:
+    app: xeno-simulator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: xeno-simulator
+  template:
+    metadata:
+      labels:
+        app: xeno-simulator
+    spec:
+      containers:
+        - name: simulator
+          image: xeno/simulator:latest
+          ports:
+            - containerPort: 8100
+          envFrom:
+            - configMapRef:
+                name: xeno-config
+            - secretRef:
+                name: xeno-secrets
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "250m"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8100
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8100
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 5
+---
+# ======================== Services ========================
+apiVersion: v1
+kind: Service
+metadata:
+  name: xeno-api
+  namespace: xeno
+  labels:
+    app: xeno-api
+spec:
+  type: ClusterIP
+  selector:
+    app: xeno-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xeno-web
+  namespace: xeno
+  labels:
+    app: xeno-web
+spec:
+  type: ClusterIP
+  selector:
+    app: xeno-web
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: xeno-simulator
+  namespace: xeno
+  labels:
+    app: xeno-simulator
+spec:
+  type: ClusterIP
+  selector:
+    app: xeno-simulator
+  ports:
+    - name: http
+      port: 8100
+      targetPort: 8100
+      protocol: TCP
+---
+# ======================== Ingress ========================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: xeno-ingress
+  namespace: xeno
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - xeno.example.com
+      secretName: xeno-tls-secret
+  rules:
+    - host: xeno.example.com
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: xeno-api
+                port:
+                  number: 8000
+          - path: /simulator(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: xeno-simulator
+                port:
+                  number: 8100
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: xeno-web
+                port:
+                  number: 3000
+---
+# ======================== HPA for API ========================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: xeno-api-hpa
+  namespace: xeno
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: xeno-api
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

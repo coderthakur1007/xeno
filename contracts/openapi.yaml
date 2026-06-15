@@ -1,0 +1,1070 @@
+openapi: 3.1.0
+info:
+  title: Xeno AI Campaign Copilot API
+  version: 1.0.0
+  description: >
+    Production CRM API for retail and D2C lifecycle marketing.
+    Provides AI-powered campaign planning, audience segmentation,
+    analytics, data ingestion, and admin configuration.
+  contact:
+    name: Xeno Engineering
+    email: engineering@xeno.ai
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token obtained from /auth/login
+
+  schemas:
+    # -------------------- Auth --------------------
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: bearer
+        expires_in:
+          type: integer
+          example: 3600
+        user:
+          $ref: "#/components/schemas/UserSummary"
+    RegisterRequest:
+      type: object
+      required: [email, password, full_name]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        full_name:
+          type: string
+        role:
+          type: string
+          enum: [admin, marketer, analyst, viewer]
+          default: marketer
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          type: string
+
+    # -------------------- Campaigns --------------------
+    CopilotPlanRequest:
+      type: object
+      required: [goal]
+      properties:
+        goal:
+          type: string
+          description: Natural-language business goal
+        name:
+          type: string
+          description: Optional campaign name
+    CopilotPlanResponse:
+      type: object
+      properties:
+        campaign_id:
+          type: string
+          format: uuid
+        segment:
+          type: object
+          properties:
+            name:
+              type: string
+            estimated_audience:
+              type: integer
+            sql:
+              type: string
+        strategy:
+          type: object
+        variants:
+          type: array
+          items:
+            type: object
+        channels:
+          type: array
+          items:
+            type: string
+        explanation:
+          type: string
+    CampaignFromGoalRequest:
+      type: object
+      required: [goal]
+      properties:
+        goal:
+          type: string
+        name:
+          type: string
+        channels:
+          type: array
+          items:
+            type: string
+    CampaignSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        goal:
+          type: string
+        status:
+          type: string
+          enum: [draft, running, completed, paused, cancelled]
+        channels:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        launched_at:
+          type: string
+          format: date-time
+          nullable: true
+    CampaignList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CampaignSummary"
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+    LaunchResult:
+      type: object
+      properties:
+        campaign_id:
+          type: string
+          format: uuid
+        messages_sent:
+          type: integer
+        status:
+          type: string
+    FunnelResponse:
+      type: object
+      properties:
+        campaign_id:
+          type: string
+          format: uuid
+        stages:
+          type: array
+          items:
+            type: object
+            properties:
+              stage:
+                type: string
+              count:
+                type: integer
+              percentage:
+                type: number
+
+    # -------------------- Segments --------------------
+    SegmentRequest:
+      type: object
+      required: [name, source]
+      properties:
+        name:
+          type: string
+        source:
+          type: string
+          enum: [visual, natural_language]
+        filters:
+          type: object
+          description: Visual filter object (when source=visual)
+        query:
+          type: string
+          description: Natural-language query (when source=natural_language)
+    SegmentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        source:
+          type: string
+        estimated_audience:
+          type: integer
+        sql:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    SegmentList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/SegmentResponse"
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+
+    # -------------------- Analytics --------------------
+    OverviewMetrics:
+      type: object
+      properties:
+        total_customers:
+          type: integer
+        total_orders:
+          type: integer
+        total_revenue:
+          type: number
+        active_campaigns:
+          type: integer
+        delivery_rate:
+          type: number
+        open_rate:
+          type: number
+        conversion_rate:
+          type: number
+    RfmRow:
+      type: object
+      properties:
+        customer_id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        recency_days:
+          type: integer
+        frequency:
+          type: integer
+        monetary:
+          type: number
+        rfm_score:
+          type: string
+        segment:
+          type: string
+    RfmList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RfmRow"
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+    CohortRow:
+      type: object
+      properties:
+        cohort_month:
+          type: string
+        total_customers:
+          type: integer
+        retention:
+          type: object
+          additionalProperties:
+            type: number
+    CustomerHealthRow:
+      type: object
+      properties:
+        customer_id:
+          type: string
+          format: uuid
+        ltv:
+          type: number
+        churn_risk:
+          type: number
+        health_score:
+          type: string
+
+    # -------------------- Ingestion --------------------
+    IngestionResult:
+      type: object
+      properties:
+        inserted:
+          type: integer
+        updated:
+          type: integer
+        errors:
+          type: integer
+        message:
+          type: string
+    OrderRow:
+      type: object
+      required: [external_id, customer_external_id, total_amount]
+      properties:
+        external_id:
+          type: string
+        customer_external_id:
+          type: string
+        status:
+          type: string
+        total_amount:
+          type: number
+        channel:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+        ordered_at:
+          type: string
+          format: date-time
+    TransactionRow:
+      type: object
+      required: [order_external_id, amount, type]
+      properties:
+        order_external_id:
+          type: string
+        amount:
+          type: number
+        type:
+          type: string
+          enum: [payment, refund, chargeback]
+        status:
+          type: string
+          enum: [completed, pending, failed]
+    CommunicationEventRow:
+      type: object
+      required: [customer_id, channel, event_type]
+      properties:
+        customer_id:
+          type: string
+          format: uuid
+        campaign_id:
+          type: string
+          format: uuid
+        message_id:
+          type: string
+          format: uuid
+        channel:
+          type: string
+        event_type:
+          type: string
+        provider_event_id:
+          type: string
+        metadata:
+          type: object
+        occurred_at:
+          type: string
+          format: date-time
+
+    # -------------------- Admin --------------------
+    AdminSetting:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: object
+        updated_at:
+          type: string
+          format: date-time
+    AdminSettingUpdate:
+      type: object
+      required: [value]
+      properties:
+        value:
+          type: object
+    FeatureFlag:
+      type: object
+      properties:
+        key:
+          type: string
+        enabled:
+          type: boolean
+        config:
+          type: object
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        resource:
+          type: string
+        detail:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+    AuditLogList:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogEntry"
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+
+    # -------------------- Webhook --------------------
+    WebhookEvent:
+      type: object
+      required: [tenant_id, campaign_id, message_id, customer_id, channel, event_type]
+      properties:
+        tenant_id:
+          type: string
+        campaign_id:
+          type: string
+        message_id:
+          type: string
+        customer_id:
+          type: string
+        channel:
+          type: string
+        event_type:
+          type: string
+        provider_event_id:
+          type: string
+        metadata:
+          type: object
+
+    # -------------------- Proof / Reports --------------------
+    ProofResult:
+      type: object
+      properties:
+        prompts_tested:
+          type: integer
+        coverage_pct:
+          type: number
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              prompt:
+                type: string
+              detected_intent:
+                type: string
+              sql:
+                type: string
+              forecast:
+                type: object
+
+    # -------------------- Errors --------------------
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+        status_code:
+          type: integer
+    ValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+              msg:
+                type: string
+              type:
+                type: string
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    PageSizeParam:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        default: 50
+        minimum: 1
+        maximum: 200
+    CampaignIdParam:
+      name: campaign_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SettingKeyParam:
+      name: key
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ValidationError"
+    Unauthorized:
+      description: Missing or invalid authentication token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+paths:
+  # ==================== Auth ====================
+  /auth/login:
+    post:
+      summary: Authenticate and obtain JWT token
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /auth/register:
+    post:
+      summary: Register a new user
+      tags: [Auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # ==================== Copilot ====================
+  /copilot/plan:
+    post:
+      summary: Generate autonomous campaign plan
+      tags: [Copilot]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CopilotPlanRequest"
+      responses:
+        "200":
+          description: Copilot plan with segment, strategy, variants, and explanations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CopilotPlanResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /copilot/proof:
+    get:
+      summary: Run proof matrix across varied marketer prompts
+      tags: [Copilot]
+      responses:
+        "200":
+          description: Prompt coverage with detected intents, SQL, forecasts, and explainability
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProofResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /reports/copilot-proof.xlsx:
+    get:
+      summary: Download Excel proof workbook
+      tags: [Copilot]
+      responses:
+        "200":
+          description: XLSX workbook containing prompt coverage and training-signal sheets
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ==================== Campaigns ====================
+  /campaigns:
+    get:
+      summary: List campaigns
+      tags: [Campaigns]
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: Paginated campaign list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /campaigns/from-goal:
+    post:
+      summary: Create campaign draft from business goal
+      tags: [Campaigns]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignFromGoalRequest"
+      responses:
+        "200":
+          description: Campaign draft
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CampaignSummary"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /campaigns/{campaign_id}/launch:
+    post:
+      summary: Launch a campaign through the channel simulator
+      tags: [Campaigns]
+      parameters:
+        - $ref: "#/components/parameters/CampaignIdParam"
+      responses:
+        "200":
+          description: Launch result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LaunchResult"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /campaigns/{campaign_id}/funnel:
+    get:
+      summary: Campaign delivery funnel
+      tags: [Campaigns]
+      parameters:
+        - $ref: "#/components/parameters/CampaignIdParam"
+      responses:
+        "200":
+          description: Funnel stages with counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FunnelResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  # ==================== Segments ====================
+  /segments:
+    get:
+      summary: List recent segments
+      tags: [Segments]
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: Paginated segment list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SegmentList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+    post:
+      summary: Create visual or natural-language segment
+      tags: [Segments]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SegmentRequest"
+      responses:
+        "200":
+          description: Created segment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SegmentResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ==================== Analytics ====================
+  /analytics/overview:
+    get:
+      summary: Overview metrics
+      tags: [Analytics]
+      responses:
+        "200":
+          description: Dashboard overview metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OverviewMetrics"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /analytics/rfm:
+    get:
+      summary: RFM customer intelligence
+      tags: [Analytics]
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: RFM rows
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RfmList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /analytics/cohorts:
+    get:
+      summary: Monthly acquisition cohort retention
+      tags: [Analytics]
+      responses:
+        "200":
+          description: Cohort retention matrix
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CohortRow"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /analytics/customer-health:
+    get:
+      summary: Customer LTV and churn-risk estimates
+      tags: [Analytics]
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: Customer health rows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/CustomerHealthRow"
+                  page:
+                    type: integer
+                  page_size:
+                    type: integer
+                  total:
+                    type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ==================== Ingestion ====================
+  /ingest/orders:
+    post:
+      summary: Ingest order rows
+      tags: [Ingestion]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rows]
+              properties:
+                rows:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/OrderRow"
+      responses:
+        "200":
+          description: Ingestion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /ingest/transactions:
+    post:
+      summary: Ingest transaction rows
+      tags: [Ingestion]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rows]
+              properties:
+                rows:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/TransactionRow"
+      responses:
+        "200":
+          description: Ingestion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /ingest/communication-events:
+    post:
+      summary: Ingest communication event rows
+      tags: [Ingestion]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rows]
+              properties:
+                rows:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/CommunicationEventRow"
+      responses:
+        "200":
+          description: Ingestion result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestionResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  # ==================== Webhooks ====================
+  /webhooks/channel-events:
+    post:
+      summary: Provider event webhook
+      tags: [Webhooks]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookEvent"
+      responses:
+        "200":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: accepted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  # ==================== Admin ====================
+  /admin/settings:
+    get:
+      summary: List tenant settings
+      tags: [Admin]
+      responses:
+        "200":
+          description: All settings for the tenant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminSetting"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/settings/{key}:
+    put:
+      summary: Upsert a tenant setting
+      tags: [Admin]
+      parameters:
+        - $ref: "#/components/parameters/SettingKeyParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminSettingUpdate"
+      responses:
+        "200":
+          description: Updated setting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminSetting"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /admin/feature-flags:
+    get:
+      summary: List feature flags
+      tags: [Admin]
+      responses:
+        "200":
+          description: Feature flags for the tenant
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/FeatureFlag"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  # ==================== Audit ====================
+  /audit-logs:
+    get:
+      summary: List audit log entries
+      tags: [Admin]
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: Paginated audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditLogList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"

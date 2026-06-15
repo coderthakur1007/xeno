@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: xeno
+      POSTGRES_PASSWORD: xeno
+      POSTGRES_DB: xeno
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xeno"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  simulator:
+    build:
+      context: ./simulator
+    environment:
+      DATABASE_URL: postgresql+psycopg://xeno:xeno@postgres:5432/xeno
+      REDIS_URL: redis://redis:6379/1
+      CRM_WEBHOOK_URL: http://api:8000/api/v1/webhooks/channel-events
+    ports:
+      - "8100:8100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://xeno:xeno@postgres:5432/xeno
+      REDIS_URL: redis://redis:6379/0
+      CHANNEL_SIMULATOR_URL: http://simulator:8100
+      JWT_SECRET: local-dev-secret-change-me
+      OTEL_SERVICE_NAME: xeno-api
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      simulator:
+        condition: service_started
+    volumes:
+      - ./scripts:/app/scripts:ro
+
+  web:
+    build:
+      context: ./frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:

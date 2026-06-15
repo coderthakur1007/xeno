@@ -1,0 +1,16 @@
+node_modules/
+.next/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+dist/
+build/
+*.pyc
+.env
+postgres_data/
+redis_data/
+outputs/
+*.db
+*.xlsx
+~$*.xlsx
